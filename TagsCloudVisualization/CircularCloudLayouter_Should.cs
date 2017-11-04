@@ -6,30 +6,31 @@ using System.Linq;
 using System.Numerics;
 using FluentAssertions;
 using NUnit.Framework;
+using NUnit.Framework.Interfaces;
 
 namespace TagsCloudVisualization
 {
     [TestFixture]
     public class CircularCloudLayouter_Should
     {
-        private CircularCloudLayouter defaultLaouter;
+        private CircularCloudLayouter layouter;
 
         [SetUp]
         public void TestSetup()
         {
-            defaultLaouter= new CircularCloudLayouter(Point.Empty);
+            layouter= new CircularCloudLayouter(Point.Empty);
         }
 
         [TestCaseSource(typeof(CircularCloudLayouter_Should), nameof(CorrectSizesWithPointsCases))]
         public void ReturnRectangleWithInputtedSize_WhenPutNextRectangle(int width, int height, int x, int y)
         {
-            var layouter = new CircularCloudLayouter(new Point(x, y));
+            layouter.SetCenter(new Point(x,y));
             var expectedSize = new Size(width, height);
             var actualRectangle = layouter.PutNextRectangle(expectedSize);
             actualRectangle.Size.Should().Be(expectedSize);
         }
 
-        [TestCase(2, 2, 10, TestName = "Layout10Squares")]
+        [TestCase(2, 2, 10, TestName = "Layout10Squares"), Timeout(2000)]
         [TestCase(10, 3, 10, TestName = "Layout10RectanglesStridedByX")]
         [TestCase(3, 10, 10, TestName = "Layout10RectanglesStridedByY")]
         [TestCase(1, 10, 10, TestName = "Layout10RectanglesWithWidthEqual1")]
@@ -38,7 +39,7 @@ namespace TagsCloudVisualization
         public void ReturnNotIntersectedRectangles(int width, int height, int count)
         {
             var sizes = Enumerable.Repeat(new Size(width, height), count);
-            var rectangles = sizes.Select(defaultLaouter.PutNextRectangle).ToArray();
+            var rectangles = sizes.Select(layouter.PutNextRectangle).ToArray();
             foreach (var testingRectangle in rectangles) //very slow
             {
                 Console.WriteLine(testingRectangle.Location);
@@ -53,7 +54,7 @@ namespace TagsCloudVisualization
         [TestCaseSource(typeof(CircularCloudLayouter_Should), nameof(NegativeAndEmptySizesCases))]
         public void ThrowArgumentException_WhenSizeIsNegativeOrEmpty(int width, int height)
         {
-            Action putNextRectangle = () => defaultLaouter.PutNextRectangle(new Size(width, height));
+            Action putNextRectangle = () => layouter.PutNextRectangle(new Size(width, height));
             putNextRectangle.ShouldThrow<ArgumentException>();
         }
 
@@ -89,5 +90,18 @@ namespace TagsCloudVisualization
             Enumerable.Range(firstRange.start, firstRange.count)
                 .SelectMany(x => Enumerable.Range(firstRange.start, firstRange.count), (x, y) => (x, y));
 
+        [TearDown]
+        public void SaveLayoutOnFailure()
+        {
+            var testResult = TestContext.CurrentContext.Result.Outcome;
+            if (!testResult.Equals(ResultState.Failure) &&
+                !testResult.Equals(ResultState.Cancelled) &&
+                !testResult.Equals(ResultState.Error) ) return;
+
+            var layoutBitmap = CloudLayoutRender.RenderImage(layouter.Layout.ToArray());
+            var path = $"{Environment.CurrentDirectory}/{TestContext.CurrentContext.Test.Name}.bmp";
+            layoutBitmap.Save(path);
+            TestContext.Out.WriteLine($"Tag cloud visualization saved to file: {path}");
+        }
     }
 }

@@ -14,10 +14,17 @@ namespace TagsCloudVisualization
             this.center = center.ToVector();
         }
 
+        public IEnumerable<Rectangle> Layout => layout;
+
         private const float InvoluteRadius = 1;
         private const float InvoluteAngleStep = (float)(Math.PI / 20.0f);
         private readonly List<Rectangle> layout;
-        private readonly Vector2 center;
+        private Vector2 center;
+
+        public void SetCenter(Point center)
+        {
+            this.center = center.ToVector();
+        }
 
         public Rectangle PutNextRectangle(Size rectangleSize)
         {
@@ -46,16 +53,16 @@ namespace TagsCloudVisualization
 
         private void PressToCenter(ref Rectangle rectangle)
         {
-            MoveToPointWhile(ref rectangle, center, rect => !IsIntersectLayout(rect));
-            MoveToPointWhile(ref rectangle, center * Vector2.UnitX, rect => !IsIntersectLayout(rect));
-            MoveToPointWhile(ref rectangle, center * Vector2.UnitY, rect => !IsIntersectLayout(rect));
+            MoveToPointWhile(ref rectangle, center, 2, rect => !IsIntersectLayout(rect));
+            MoveToPointWhile(ref rectangle, center * Vector2.UnitX + rectangle.GetCenter()*Vector2.UnitY, 1, rect => !IsIntersectLayout(rect));
+            MoveToPointWhile(ref rectangle, center * Vector2.UnitY + rectangle.GetCenter() * Vector2.UnitX, 1, rect => !IsIntersectLayout(rect));
         }
 
-        private void MoveToPointWhile(ref Rectangle rectangle, Vector2 point, Func<Rectangle,bool> predicate)
+        private static void MoveToPointWhile(ref Rectangle rectangle, Vector2 point,int step, Func<Rectangle,bool> predicate)
         {
-            var translationVector = Vector2.Normalize(point - rectangle.GetCenter()) * 2;
+            var translationVector = Vector2.Normalize(point - rectangle.GetCenter())*step;
             var lastFreeLocation = rectangle.Location;
-            while (predicate(rectangle) && !rectangle.GetCenter().IsClose(point))
+            while (predicate(rectangle) && Math.Abs((rectangle.GetCenter() - point).Length()) > step)
             {
                 lastFreeLocation = rectangle.Location;
                 rectangle.Location = (translationVector + rectangle.Location.ToVector()).RoundToPoint();
