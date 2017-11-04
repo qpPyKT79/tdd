@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Linq;
+using System.Numerics;
 using FluentAssertions;
 using NUnit.Framework;
 
@@ -11,15 +12,52 @@ namespace TagsCloudVisualization
     [TestFixture]
     public class CircularCloudLayouter_Should
     {
-        private static IEnumerable<(int, int)> CartesianProduct(int start, int count) =>
-            CartesianProduct((start, count), (start, count));
+        private CircularCloudLayouter defaultLaouter;
 
-        private static IEnumerable<(int, int)> CartesianProduct((int start, int count) firstRange,
-            (int start, int count) secondRange) =>
-            Enumerable.Range(firstRange.start, firstRange.count)
-                .SelectMany(x => Enumerable.Range(firstRange.start, firstRange.count), (x, y) => (x, y));
+        [SetUp]
+        public void TestSetup()
+        {
+            defaultLaouter= new CircularCloudLayouter(Point.Empty);
+        }
 
-        public static IEnumerable CorrectSizesWithPoints
+        [TestCaseSource(typeof(CircularCloudLayouter_Should), nameof(CorrectSizesWithPointsCases))]
+        public void ReturnRectangleWithInputtedSize_WhenPutNextRectangle(int width, int height, int x, int y)
+        {
+            var layouter = new CircularCloudLayouter(new Point(x, y));
+            var expectedSize = new Size(width, height);
+            var actualRectangle = layouter.PutNextRectangle(expectedSize);
+            actualRectangle.Size.Should().Be(expectedSize);
+        }
+
+        [TestCase(2, 2, 10, TestName = "Layout10Squares")]
+        [TestCase(10, 3, 10, TestName = "Layout10RectanglesStridedByX")]
+        [TestCase(3, 10, 10, TestName = "Layout10RectanglesStridedByY")]
+        [TestCase(1, 10, 10, TestName = "Layout10RectanglesWithWidthEqual1")]
+        [TestCase(1, 10, 10, TestName = "Layout10RectanglesWithHeightEqual1")]
+        [TestCase(1, 1, 10, TestName = "Layout10SquaresWithSideEqual1")]
+        public void ReturnNotIntersectedRectangles(int width, int height, int count)
+        {
+            var sizes = Enumerable.Repeat(new Size(width, height), count);
+            var rectangles = sizes.Select(defaultLaouter.PutNextRectangle).ToArray();
+            foreach (var testingRectangle in rectangles) //very slow
+            {
+                Console.WriteLine(testingRectangle.Location);
+                foreach (var rectangle in rectangles.Where(rect => !rect.Equals(testingRectangle)))
+                {
+                    testingRectangle.IntersectsWith(rectangle).Should().BeFalse();
+
+                }
+            }
+        }
+
+        [TestCaseSource(typeof(CircularCloudLayouter_Should), nameof(NegativeAndEmptySizesCases))]
+        public void ThrowArgumentException_WhenSizeIsNegativeOrEmpty(int width, int height)
+        {
+            Action putNextRectangle = () => defaultLaouter.PutNextRectangle(new Size(width, height));
+            putNextRectangle.ShouldThrow<ArgumentException>();
+        }
+
+        public static IEnumerable CorrectSizesWithPointsCases
         {
             get
             {
@@ -33,7 +71,7 @@ namespace TagsCloudVisualization
             }
         }
 
-        public static IEnumerable NegativeAndEmptySizes
+        public static IEnumerable NegativeAndEmptySizesCases
         {
             get
             {
@@ -43,38 +81,13 @@ namespace TagsCloudVisualization
             }
         }
 
-        [TestCaseSource(typeof(CircularCloudLayouter_Should), nameof(CorrectSizesWithPoints))]
-        public void ReturnRectangleWithInputtedSize_WhenPutNextRectangle(int width, int height, int x, int y)
-        {
-            var layouter = new CircularCloudLayouter(new Point(x, y));
-            var expectedSize = new Size(width, height);
-            var actualRectangle = layouter.PutNextRectangle(expectedSize);
-            actualRectangle.Size.Should().Be(expectedSize);
-        }
+        private static IEnumerable<(int, int)> CartesianProduct(int start, int count) =>
+            CartesianProduct((start, count), (start, count));
 
-        [TestCase(2, 2, 10)]
-        [TestCase(10, 3, 10)]
-        [TestCase(3, 10, 10)]
-        public void ReturnNotIntersectedRectangles(int width, int height, int count)
-        {
-            var layouter = new CircularCloudLayouter(Point.Empty);
-            var sizes = Enumerable.Repeat(new Size(width, height), count);
-            var rectangles = sizes.Select(layouter.PutNextRectangle).ToArray();
-            foreach (var testingRectangle in rectangles) //very slow
-            {
-                foreach (var rectangle in rectangles.Where(rect => !rect.Equals(testingRectangle)))
-                {
-                    testingRectangle.IntersectsWith(rectangle).Should().BeFalse();
-                }
-            }
-        }
+        private static IEnumerable<(int, int)> CartesianProduct((int start, int count) firstRange,
+            (int start, int count) secondRange) =>
+            Enumerable.Range(firstRange.start, firstRange.count)
+                .SelectMany(x => Enumerable.Range(firstRange.start, firstRange.count), (x, y) => (x, y));
 
-        [TestCaseSource(typeof(CircularCloudLayouter_Should), nameof(NegativeAndEmptySizes))]
-        public void ThrowArgumentException_WhenSizeIsNegativeOrEmpty(int width, int height)
-        {
-            var layouter = new CircularCloudLayouter(Point.Empty);
-            Action putNextRectangle = () => layouter.PutNextRectangle(new Size(width, height));
-            putNextRectangle.ShouldThrow<ArgumentException>();
-        }
     }
 }

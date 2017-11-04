@@ -8,16 +8,16 @@ namespace TagsCloudVisualization
 {
     public class CircularCloudLayouter
     {
-        private const float InvoluteRadius = 1;
-        private const float InvoluteAngleStep = (float) (Math.PI / 20.0f);
-        private readonly List<Rectangle> layout;
-        private readonly Vector2 center;
-
         public CircularCloudLayouter(Point center)
         {
             layout = new List<Rectangle>();
             this.center = center.ToVector();
         }
+
+        private const float InvoluteRadius = 1;
+        private const float InvoluteAngleStep = (float)(Math.PI / 20.0f);
+        private readonly List<Rectangle> layout;
+        private readonly Vector2 center;
 
         public Rectangle PutNextRectangle(Size rectangleSize)
         {
@@ -25,16 +25,16 @@ namespace TagsCloudVisualization
                 throw new ArgumentException("Size must be positive and not empty");
 
             var rectangle = new Rectangle(Point.Empty, rectangleSize);
-            PlaceRectangleOnInvolute(rectangle);
+            PlaceRectangleOnInvolute(ref rectangle);
             if (layout.Count > 0)
             {
-                PressToCenter(rectangle);
+                PressToCenter(ref rectangle);
             }
             layout.Add(rectangle);
             return rectangle;
         }
 
-        private void PlaceRectangleOnInvolute(Rectangle rectangle)
+        private void PlaceRectangleOnInvolute(ref Rectangle rectangle)
         {
             var angle = 0.0f;
             while (IsIntersectLayout(rectangle))
@@ -44,21 +44,21 @@ namespace TagsCloudVisualization
             }
         }
 
-        private void PressToCenter(Rectangle rectangle)
+        private void PressToCenter(ref Rectangle rectangle)
         {
-            MoveToPointWhile(rectangle, center, () => !IsIntersectLayout(rectangle));
-            MoveToPointWhile(rectangle, center * Vector2.UnitX, () => !IsIntersectLayout(rectangle));
-            MoveToPointWhile(rectangle, center * Vector2.UnitY, () => !IsIntersectLayout(rectangle));
+            MoveToPointWhile(ref rectangle, center, rect => !IsIntersectLayout(rect));
+            MoveToPointWhile(ref rectangle, center * Vector2.UnitX, rect => !IsIntersectLayout(rect));
+            MoveToPointWhile(ref rectangle, center * Vector2.UnitY, rect => !IsIntersectLayout(rect));
         }
 
-        private void MoveToPointWhile(Rectangle rectangle, Vector2 point, Func<bool> predicate)
+        private void MoveToPointWhile(ref Rectangle rectangle, Vector2 point, Func<Rectangle,bool> predicate)
         {
-            var translationVector = Vector2.Normalize(point - rectangle.GetCenter());
+            var translationVector = Vector2.Normalize(point - rectangle.GetCenter()) * 2;
             var lastFreeLocation = rectangle.Location;
-            while (predicate() && !rectangle.GetCenter().IsClose(center))
+            while (predicate(rectangle) && !rectangle.GetCenter().IsClose(point))
             {
                 lastFreeLocation = rectangle.Location;
-                rectangle.Translate(translationVector);
+                rectangle.Location = (translationVector + rectangle.Location.ToVector()).RoundToPoint();
             }
             rectangle.Location = lastFreeLocation;
         }
